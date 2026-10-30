@@ -3,7 +3,7 @@ name: Build TVitto
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ '**' ]
 
 jobs:
   build:
@@ -76,5 +76,4 @@ jobs:
         with:
           name: TVitto-debug-apk
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
-          if-no-files-fou
-          nd: error
+          if-no-files-found: error
