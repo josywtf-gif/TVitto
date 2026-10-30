@@ -49,8 +49,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # Android SDK уже установлен на ubuntu-latest; только принимаем лицензии.
+      - name: Accept Android SDK licenses
+        shell: bash
+        run: |
+          yes | "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -73,5 +76,5 @@ jobs:
         with:
           name: TVitto-debug-apk
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-          
+          if-no-files-fou
+          nd: error
