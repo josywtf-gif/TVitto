@@ -1,4 +1,3 @@
-
 name: TVitto Build
 
 on: [push, workflow_dispatch]
@@ -36,17 +35,16 @@ jobs:
             -dname "CN=Android Debug,O=Android,C=US"
 
       - name: Extract TVitto source
-        run: unzip -q TVitto.zip
+        run: |
+          unzip -oq TVitto.zip -x ".github/*"
 
       - name: Build TVitto APK
         run: |
-          cd TVitto
           gradle :app:assembleRelease --no-daemon
 
       - name: Rename APK
         run: |
-          cp TVitto/app/build/outputs/apk/release/app-release.apk \
-             TVitto.apk
+          cp app/build/outputs/apk/release/app-release.apk TVitto.apk
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
