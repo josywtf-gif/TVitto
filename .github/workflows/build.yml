@@ -1,79 +1,57 @@
-name: Build TVitto
 
-on:
-  workflow_dispatch:
-  push:
-    branches: [ '**' ]
+name: TVitto Build
+
+on: [push, workflow_dispatch]
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # Если в репозиторий загружен ZIP с проектом — распаковываем его.
-      # Если проект уже лежит в корне — собираем его как есть.
-      - name: Unzip project
-        shell: bash
-        run: |
-          set -euo pipefail
-          ZIP="$(ls -t ./*.zip 2>/dev/null | head -n 1 || true)"
-          if [ -n "$ZIP" ]; then
-            echo "Unpacking $ZIP"
-            DEST="$RUNNER_TEMP/tvitto-src"
-            rm -rf "$DEST"
-            mkdir -p "$DEST"
-            unzip -q -o "$ZIP" -d "$DEST"
-            SETTINGS="$(find "$DEST" -maxdepth 3 \( -name settings.gradle.kts -o -name settings.gradle \) -not -path '*/__MACOSX/*' | head -n 1)"
-            if [ -z "$SETTINGS" ]; then
-              echo "settings.gradle(.kts) not found inside $ZIP"
-              exit 1
-            fi
-            DIR="$(dirname "$SETTINGS")"
-          else
-            if [ ! -f settings.gradle.kts ] && [ ! -f settings.gradle ]; then
-              echo "No ZIP and no Gradle project in the repository root"
-              exit 1
-            fi
-            DIR="$GITHUB_WORKSPACE"
-          fi
-          echo "Project dir: $DIR"
-          echo "PROJECT_DIR=$DIR" >> "$GITHUB_ENV"
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: 17
 
-      # Android SDK уже установлен на ubuntu-latest; только принимаем лицензии.
-      - name: Accept Android SDK licenses
-        shell: bash
-        run: |
-          yes | "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: '8.9'
+          gradle-version: 8.7
 
-      - name: Build debug APK
-        shell: bash
+      - name: Debug keystore
         run: |
-          set -euo pipefail
-          cd "$PROJECT_DIR"
-          if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
-            gradle wrapper --gradle-version 8.9
-          fi
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          mkdir -p ~/.android
+          keytool -genkey -v \
+            -keystore ~/.android/debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - name: Extract TVitto source
+        run: unzip -q TVitto.zip
+
+      - name: Build TVitto APK
+        run: |
+          cd TVitto
+          gradle :app:assembleRelease --no-daemon
+
+      - name: Rename APK
+        run: |
+          cp TVitto/app/build/outputs/apk/release/app-release.apk \
+             TVitto.apk
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: TVitto-debug-apk
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
+          tag_name: v${{ github.run_number }}
+          name: TVitto v${{ github.run_number }}
+          files: TVitto.apk
+          generate_release_notes: true
